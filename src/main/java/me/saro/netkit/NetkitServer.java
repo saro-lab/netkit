@@ -5,15 +5,12 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.AsynchronousChannelGroup;
 import java.nio.channels.AsynchronousServerSocketChannel;
-import java.nio.channels.AsynchronousSocketChannel;
-import java.nio.channels.CompletionHandler;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
-import lombok.SneakyThrows;
 import lombok.extern.log4j.Log4j2;
 
 /**
@@ -30,7 +27,7 @@ public class NetkitServer implements Closeable {
     @Getter @Setter(value=AccessLevel.PACKAGE) AsynchronousServerSocketChannel asynchronousServerSocketChannel;
     @Getter final Map<String, NetkitConnection> connections = new ConcurrentHashMap<>();
 
-    public static NetkitServer run(int port, int byteBufferUnitSize, AsynchronousChannelGroup asynchronousChannelGroup) throws IOException {
+    public static NetkitServer bind(int port, int byteBufferUnitSize, AsynchronousChannelGroup asynchronousChannelGroup) throws IOException {
         NetkitServer server = new NetkitServer();
         server.setAsynchronousChannelGroup(asynchronousChannelGroup);
         server.setByteBufferUnitSize(byteBufferUnitSize);
@@ -39,12 +36,12 @@ public class NetkitServer implements Closeable {
         return server;
     }
 
-    public static NetkitServer run(int port, int byteBufferUnitSize) throws IOException {
-        return run(port, byteBufferUnitSize, null);
+    public static NetkitServer bind(int port, int byteBufferUnitSize) throws IOException {
+        return bind(port, byteBufferUnitSize, null);
     }
 
-    public static NetkitServer run(int port) throws IOException {
-        return run(port, 8192, null);
+    public static NetkitServer bind(int port) throws IOException {
+        return bind(port, 8192, null);
     }
 
     NetkitServer() {
@@ -84,22 +81,14 @@ public class NetkitServer implements Closeable {
         log.info("bind port " + port);
     }
     
-    public <T extends NetkitConnection> NetkitReader accept(NetkitAccept<T> accept) {
-        asynchronousServerSocketChannel.accept(null, new CompletionHandler<AsynchronousSocketChannel, Void>() {
-            @SneakyThrows
-            public void completed(final AsynchronousSocketChannel channel, Void v) {
-                if (!asynchronousServerSocketChannel.isOpen()) {
-                    return;
-                }
-            }
-            public void failed(Throwable error, Void v) {
-                throw new RuntimeException(error);
-            }
-        });
-    }
-    
-    public static interface NetkitAccept<T> {
+    public <T extends NetkitConnection> NetkitServerAccepter accept() {
+        NetkitServerAccepter accept = new NetkitServerAccepter();
         
+        accept.setByteBufferUnitSize(byteBufferUnitSize);
+        accept.setAsynchronousServerSocketChannel(asynchronousServerSocketChannel);
+        accept.setConnections(connections);
+        
+        return accept;
     }
     
     @Override

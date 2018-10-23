@@ -11,7 +11,13 @@ public class AppTest {
 
     public static void main( String[] args ) throws Exception {
 
-        NetkitServer.run(2100);
+        NetkitServer
+            .bind(2100)
+            .accept()
+                .prev(null)
+                .next(null)
+                .error(null)
+            .read(null);
 
         System.in.read();
     }
