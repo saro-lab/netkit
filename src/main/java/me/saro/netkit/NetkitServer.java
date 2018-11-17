@@ -6,6 +6,7 @@ import java.net.InetSocketAddress;
 import java.nio.channels.AsynchronousChannelGroup;
 import java.nio.channels.AsynchronousServerSocketChannel;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 import lombok.AccessLevel;
@@ -25,7 +26,8 @@ public class NetkitServer implements Closeable {
     @Getter @Setter(value=AccessLevel.PACKAGE) int byteBufferUnitSize;
     @Getter @Setter(value=AccessLevel.PACKAGE) AsynchronousChannelGroup asynchronousChannelGroup;
     @Getter @Setter(value=AccessLevel.PACKAGE) AsynchronousServerSocketChannel asynchronousServerSocketChannel;
-    @Getter final Map<Long, NetkitConnection> connections = new ConcurrentHashMap<>();
+    @Getter Map<Long, NetkitConnection> connections = new ConcurrentHashMap<>();
+    final Thread gcThread = new Thread(this::gc);
 
     /**
      * bind server
@@ -126,17 +128,40 @@ public class NetkitServer implements Closeable {
         log.info("using asynchronous channel group : " + (asynchronousChannelGroup != null));
     }
     
+    private void gc() {
+        int error = 0;
+        while (connections != null) {
+            try {
+                Thread.sleep(60000);
+                log.info("netkit.gc()");
+                connections.forEach((k, v) -> {
+                    try {
+                        if (Optional.of(v).map(e -> e.isOpen()).orElse(false)) {
+                            return;
+                        }
+                    } catch (Exception e) {
+                    }
+                    connections.remove(k);
+                });
+                error = 0;
+            } catch (Exception e) {
+                log.error(e.getMessage(), e);
+                if (error++ > 1000) {
+                    throw new RuntimeException("server gc thread error!!!");
+                }
+            }
+        }
+    }
+    
     /**
      * close
      */
     @Override
     public void close() throws IOException {
-        connections.entrySet().parallelStream().forEach(e -> {
-            try (e.getValue().channel) {
-            } catch (Exception ex) {
-            }
-            connections.remove(e.getKey());
-        });
+//        var connections = this.connections;
+//        this.connections = null;
+//        connections.values().forEach(ThrowableConsumer.runtime(e -> e.getChannel().close()));
+//        connections.clear();
         try (AsynchronousServerSocketChannel close = this.asynchronousServerSocketChannel) {
         }
     }
