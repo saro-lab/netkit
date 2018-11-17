@@ -1,17 +1,13 @@
 package me.saro.netkit;
 
-import java.nio.channels.AsynchronousServerSocketChannel;
+import java.lang.reflect.Method;
 import java.nio.channels.AsynchronousSocketChannel;
 import java.nio.channels.CompletionHandler;
-import java.util.Map;
-import java.util.function.Function;
 
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
-import me.saro.commons.function.ThrowableConsumer;
+import me.saro.commons.function.ThrowableBiConsumer;
 import me.saro.commons.function.ThrowablePredicate;
+import me.saro.netkit.reader.NetkitReader;
 
 /**
  * Netkit Server Accepter
@@ -20,52 +16,79 @@ import me.saro.commons.function.ThrowablePredicate;
  */
 @Log4j2
 public class NetkitServerAccepter {
-    NetkitServerAccepter() {
+    
+    final NetkitServer server;
+    ThrowableBiConsumer<NetkitConnection, Throwable> throwableConsumer = (c, t) -> {};
+    ThrowablePredicate<AsynchronousSocketChannel> filter = e -> true;
+    
+    NetkitServerAccepter(NetkitServer netkitServer) {
+        this.server = netkitServer;
     }
-    
-    @Getter @Setter(value=AccessLevel.PACKAGE) int byteBufferUnitSize;
-    @Getter @Setter(value=AccessLevel.PACKAGE) AsynchronousServerSocketChannel asynchronousServerSocketChannel;
-    @Getter @Setter(value=AccessLevel.PACKAGE) Map<String, NetkitConnection> connections;
-    
-    ThrowableConsumer<Throwable> throwableConsumer;
-    ThrowablePredicate<AsynchronousSocketChannel> filter;
 
     public NetkitServerAccepter filter(ThrowablePredicate<AsynchronousSocketChannel> filter) {
         this.filter = filter;
         return this;
     }
     
-    public NetkitServerAccepter error(ThrowableConsumer<Throwable> throwableConsumer) {
+    public NetkitServerAccepter error(ThrowableBiConsumer<NetkitConnection, Throwable> throwableConsumer) {
         this.throwableConsumer = throwableConsumer;
         return this;
     }
     
-    public <T extends NetkitReader> T read(T t) {
+    public <T extends NetkitReader> T reader(T t) {
         
-        asynchronousServerSocketChannel.accept(null, new CompletionHandler<AsynchronousSocketChannel, Void>() {
+        final var assc = server.getAsynchronousServerSocketChannel();
+        Method accept, bind;
+        try {
+            Class<?> clazz = t.getClass();
+            accept = clazz.getDeclaredMethod("accept", NetkitConnection.class);
+            accept.setAccessible(true);
+            bind = clazz.getDeclaredMethod("bind", NetkitServer.class, NetkitServerAccepter.class);
+            bind.setAccessible(true);
+            bind.invoke(t, server, this);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        
+        // accept
+        assc.accept(new NetkitConnection(), new CompletionHandler<AsynchronousSocketChannel, NetkitConnection>() {
             
-            @Override public void completed(AsynchronousSocketChannel channel, Void v) {
+            // get accept
+            @Override public void completed(AsynchronousSocketChannel channel, NetkitConnection netkitConnection) {
+                
+                // establish next accept
+                assc.accept(new NetkitConnection(), this);
+                
                 try {
-                    filter
+                    server.addNetkitConnection(netkitConnection, channel);
+                    accept.invoke(t, netkitConnection);
                 } catch (Exception e) {
-                    try {
-                        channel.close();
-                    } catch (Exception e2)
+                    error(netkitConnection, e);
+                    server.removeNetkitConnection(netkitConnection.id);
+                    try (channel) {
+                    } catch (Exception x) {
+                    }
                 }
             }
 
-            @Override public void failed(Throwable throwable, Void v) {
-                error(throwable);
+            // error
+            @Override public void failed(Throwable throwable, NetkitConnection netkitConnection) {
+                error(netkitConnection, throwable);
+                server.removeNetkitConnection(netkitConnection.id);
             }
         });
         
         return t;
     }
     
-    private void error(Throwable throwable) {
+    /**
+     * catch error
+     * @param throwable
+     */
+    private void error(NetkitConnection netkitConnection, Throwable throwable) {
         try {
             if (throwableConsumer != null) {
-                throwableConsumer.accept(throwable);
+                throwableConsumer.accept(netkitConnection != null ? netkitConnection : new NetkitConnection(), throwable);
             } else {
                 log.error(throwable);
             }

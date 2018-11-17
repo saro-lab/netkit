@@ -138,12 +138,14 @@ public class NetkitServer implements Closeable {
      * @throws IOException
      */
     void addNetkitConnection(NetkitConnection conn, AsynchronousSocketChannel channel) throws IOException {
+        conn.channel = channel;
         for (int i = 0 ; i < 10000 ; i++) {
             long id = (long)(Math.random() * Long.MAX_VALUE);
             synchronized (connections) {
-                if (connections.putIfAbsent(id, conn).getId() == -1L) {
+                NetkitConnection nc = connections.get(id);
+                if (nc == null || nc.getId() == -1L) {
                     conn.id = id;
-                    conn.channel = channel;
+                    connections.put(id, conn);
                     log.info("create port : " + ((InetSocketAddress)channel.getRemoteAddress()).getPort());
                     return;
                 }
@@ -156,16 +158,18 @@ public class NetkitServer implements Closeable {
      * remove connection
      * @param id
      */
-    void removeNetkitConnection(Long id) {
-        NetkitConnection conn;
-        synchronized (connections) {
-            conn = connections.remove(id);
-        }
-        if (conn != null) {
-            conn.id = -1L;
-            try {
-                conn.channel.close();
-            } catch (Exception e) {
+    void removeNetkitConnection(long id) {
+        if (id > -1L) {
+            NetkitConnection conn;
+            synchronized (connections) {
+                conn = connections.remove(id);
+            }
+            if (conn != null) {
+                conn.id = -1L;
+                try {
+                    conn.channel.close();
+                } catch (Exception e) {
+                }
             }
         }
     }
