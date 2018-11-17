@@ -5,8 +5,8 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 
 import me.saro.commons.function.ThrowableRunnable;
-import me.saro.netkit.NetkitServer;
-import me.saro.netkit.reader.NetkitBytesReader;
+import notuse.me.saro.netkit.NetkitServer;
+import notuse.me.saro.netkit.reader.NetkitBytesReader;
 
 public class AppTest {
 
@@ -18,7 +18,7 @@ public class AppTest {
                 .reader(new NetkitBytesReader((size, bytes, conn) -> {
                    var str = new String(bytes, 0, size);
                    System.out.println("도착 : " + str);
-                }, (c) -> System.out.println("종료 : " + c.toString()) ,(c, e) -> e.printStackTrace()));
+                }, (c, e) -> e.printStackTrace()));
         
         
         tempSendAll();

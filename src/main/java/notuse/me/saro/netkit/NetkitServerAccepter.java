@@ -1,13 +1,15 @@
-package me.saro.netkit;
+package notuse.me.saro.netkit;
 
 import java.lang.reflect.Method;
 import java.nio.channels.AsynchronousSocketChannel;
 import java.nio.channels.CompletionHandler;
 
+import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 import me.saro.commons.function.ThrowableBiConsumer;
+import me.saro.commons.function.ThrowableConsumer;
 import me.saro.commons.function.ThrowablePredicate;
-import me.saro.netkit.reader.NetkitReader;
+import notuse.me.saro.netkit.reader.NetkitReader;
 
 /**
  * Netkit Server Accepter
@@ -20,6 +22,7 @@ public class NetkitServerAccepter {
     final NetkitServer server;
     ThrowableBiConsumer<NetkitConnection, Throwable> throwableConsumer = (c, t) -> {};
     ThrowablePredicate<AsynchronousSocketChannel> filter = e -> true;
+    @Getter ThrowableConsumer<NetkitConnection> eof = e -> {};
     
     NetkitServerAccepter(NetkitServer netkitServer) {
         this.server = netkitServer;
@@ -32,6 +35,11 @@ public class NetkitServerAccepter {
     
     public NetkitServerAccepter error(ThrowableBiConsumer<NetkitConnection, Throwable> throwableConsumer) {
         this.throwableConsumer = throwableConsumer;
+        return this;
+    }
+    
+    public NetkitServerAccepter eof(ThrowableConsumer<NetkitConnection> eof) {
+        this.eof = eof;
         return this;
     }
     

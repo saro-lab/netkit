@@ -1,4 +1,4 @@
-package me.saro.netkit;
+package notuse.me.saro.netkit;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -6,14 +6,22 @@ import java.net.InetSocketAddress;
 import java.nio.channels.AsynchronousChannelGroup;
 import java.nio.channels.AsynchronousServerSocketChannel;
 import java.nio.channels.AsynchronousSocketChannel;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.SneakyThrows;
 import lombok.extern.log4j.Log4j2;
+import me.saro.commons.function.ThrowableConsumer;
+import me.saro.commons.function.ThrowableRunnable;
 
 /**
  * Netkit Server
@@ -23,12 +31,12 @@ import lombok.extern.log4j.Log4j2;
 @Log4j2
 public class NetkitServer implements Closeable {
 
-    @Getter @Setter(value=AccessLevel.PACKAGE) int port = -1;
-    @Getter @Setter(value=AccessLevel.PACKAGE) int byteBufferUnitSize;
-    @Getter @Setter(value=AccessLevel.PACKAGE) AsynchronousChannelGroup asynchronousChannelGroup;
-    @Getter @Setter(value=AccessLevel.PACKAGE) AsynchronousServerSocketChannel asynchronousServerSocketChannel;
-    @Getter Map<Long, NetkitConnection> connections = new ConcurrentHashMap<>();
-    final Thread gcThread = new Thread(this::garbageCollection);
+    @Setter(value=AccessLevel.PACKAGE) int port = -1;
+    @Setter(value=AccessLevel.PACKAGE) int byteBufferUnitSize;
+    @Setter(value=AccessLevel.PACKAGE) AsynchronousChannelGroup asynchronousChannelGroup;
+    @Setter(value=AccessLevel.PACKAGE) AsynchronousServerSocketChannel asynchronousServerSocketChannel;
+    List<NetkitConnection> connections = Collections.synchronizedList(new LinkedList<>());
+    Timer gc = new Timer(true);
 
     /**
      * bind server
@@ -82,6 +90,14 @@ public class NetkitServer implements Closeable {
         return new NetkitServerAccepter(this);
     }
     
+    public TimerTask timerTask(ThrowableConsumer<TimerTask> task) {
+        return new TimerTask() {
+            @Override @SneakyThrows public void run() {
+                task.accept(this);
+            }
+        };
+    }
+    
     /**
      * run server
      * @throws IOException
@@ -99,9 +115,11 @@ public class NetkitServer implements Closeable {
         
         asynchronousServerSocketChannel.bind(new InetSocketAddress(port));
         
+        
+        
         log.info("bind port " + port);
         
-        gcThread.start();
+        gc.schedule(timerTask(e -> this.garbageCollection()), 60000);
     }
     
     /**
@@ -158,7 +176,7 @@ public class NetkitServer implements Closeable {
      * remove connection
      * @param id
      */
-    void removeNetkitConnection(long id) {
+    public void removeNetkitConnection(long id) {
         if (id > -1L) {
             NetkitConnection conn;
             synchronized (connections) {
@@ -167,7 +185,9 @@ public class NetkitServer implements Closeable {
             if (conn != null) {
                 conn.id = -1L;
                 try {
-                    conn.channel.close();
+                    if (conn.channel.isOpen()) {
+                        conn.channel.close();
+                    }
                 } catch (Exception e) {
                 }
             }
