@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.AsynchronousChannelGroup;
 import java.nio.channels.AsynchronousServerSocketChannel;
+import java.nio.channels.AsynchronousSocketChannel;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -128,6 +129,24 @@ public class NetkitServer implements Closeable {
         
         // asynchronous channel group
         log.info("using asynchronous channel group : " + (asynchronousChannelGroup != null));
+    }
+    
+    /**
+     * add connection
+     * @param conn
+     * @param channel
+     * @throws IOException
+     */
+    void addNetkitConnection(NetkitConnection conn, AsynchronousSocketChannel channel) throws IOException {
+       for (int i = 0 ; i < 10000 ; i++) {
+            long id = (long)(Math.random() * Long.MAX_VALUE);
+            if (connections.putIfAbsent(id, conn).getId() == -1L) {
+                conn.id = id;
+                conn.channel = channel;
+                return;
+            }
+        }
+        throw new IOException("fail new connection");
     }
     
     /**
