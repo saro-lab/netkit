@@ -17,7 +17,7 @@ public class Netkit {
     }
     
     /**
-     * safe allocateDirect
+     * safe array() of the allocateDirect or allocate
      * @return
      */
     public static byte[] safeArray(ByteBuffer buffer) {
