@@ -27,7 +27,7 @@ public class NetkitServer implements Closeable {
     @Getter @Setter(value=AccessLevel.PACKAGE) AsynchronousChannelGroup asynchronousChannelGroup;
     @Getter @Setter(value=AccessLevel.PACKAGE) AsynchronousServerSocketChannel asynchronousServerSocketChannel;
     @Getter Map<Long, NetkitConnection> connections = new ConcurrentHashMap<>();
-    final Thread gcThread = new Thread(this::gc);
+    final Thread gcThread = new Thread(this::garbageCollection);
 
     /**
      * bind server
@@ -99,6 +99,8 @@ public class NetkitServer implements Closeable {
         asynchronousServerSocketChannel.bind(new InetSocketAddress(port));
         
         log.info("bind port " + port);
+        
+        gcThread.start();
     }
     
     /**
@@ -128,12 +130,16 @@ public class NetkitServer implements Closeable {
         log.info("using asynchronous channel group : " + (asynchronousChannelGroup != null));
     }
     
-    private void gc() {
+    /**
+     * Garbage Collection
+     */
+    private void garbageCollection() {
+        log.info("start netkit gc");
         int error = 0;
         while (connections != null) {
             try {
                 Thread.sleep(60000);
-                log.info("netkit.gc()");
+                log.info("execute netkit gc");
                 connections.forEach((k, v) -> {
                     try {
                         if (Optional.of(v).map(e -> e.isOpen()).orElse(false)) {
