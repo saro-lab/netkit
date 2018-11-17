@@ -25,7 +25,7 @@ public class NetkitServer implements Closeable {
     @Getter @Setter(value=AccessLevel.PACKAGE) int byteBufferUnitSize;
     @Getter @Setter(value=AccessLevel.PACKAGE) AsynchronousChannelGroup asynchronousChannelGroup;
     @Getter @Setter(value=AccessLevel.PACKAGE) AsynchronousServerSocketChannel asynchronousServerSocketChannel;
-    @Getter final Map<String, NetkitConnection> connections = new ConcurrentHashMap<>();
+    @Getter final Map<Long, NetkitConnection> connections = new ConcurrentHashMap<>();
 
     /**
      * bind server
@@ -68,7 +68,7 @@ public class NetkitServer implements Closeable {
     /**
      * using static bind
      */
-    NetkitServer() {
+    private NetkitServer() {
     }
     
     /**
@@ -76,13 +76,7 @@ public class NetkitServer implements Closeable {
      * @return
      */
     public <T extends NetkitConnection> NetkitServerAccepter accept() {
-        NetkitServerAccepter accept = new NetkitServerAccepter();
-        
-        accept.setByteBufferUnitSize(byteBufferUnitSize);
-        accept.setAsynchronousServerSocketChannel(asynchronousServerSocketChannel);
-        accept.setConnections(connections);
-        
-        return accept;
+        return new NetkitServerAccepter(this);
     }
     
     /**
