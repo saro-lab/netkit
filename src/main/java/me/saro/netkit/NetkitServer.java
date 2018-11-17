@@ -138,15 +138,36 @@ public class NetkitServer implements Closeable {
      * @throws IOException
      */
     void addNetkitConnection(NetkitConnection conn, AsynchronousSocketChannel channel) throws IOException {
-       for (int i = 0 ; i < 10000 ; i++) {
+        for (int i = 0 ; i < 10000 ; i++) {
             long id = (long)(Math.random() * Long.MAX_VALUE);
-            if (connections.putIfAbsent(id, conn).getId() == -1L) {
-                conn.id = id;
-                conn.channel = channel;
-                return;
+            synchronized (connections) {
+                if (connections.putIfAbsent(id, conn).getId() == -1L) {
+                    conn.id = id;
+                    conn.channel = channel;
+                    log.info("create port : " + ((InetSocketAddress)channel.getRemoteAddress()).getPort());
+                    return;
+                }
             }
         }
         throw new IOException("fail new connection");
+    }
+    
+    /**
+     * remove connection
+     * @param id
+     */
+    void removeNetkitConnection(Long id) {
+        NetkitConnection conn;
+        synchronized (connections) {
+            conn = connections.remove(id);
+        }
+        if (conn != null) {
+            conn.id = -1L;
+            try {
+                conn.channel.close();
+            } catch (Exception e) {
+            }
+        }
     }
     
     /**
@@ -166,7 +187,7 @@ public class NetkitServer implements Closeable {
                         }
                     } catch (Exception e) {
                     }
-                    connections.remove(k);
+                    removeNetkitConnection(k);
                 });
                 error = 0;
             } catch (Exception e) {
@@ -183,10 +204,6 @@ public class NetkitServer implements Closeable {
      */
     @Override
     public void close() throws IOException {
-//        var connections = this.connections;
-//        this.connections = null;
-//        connections.values().forEach(ThrowableConsumer.runtime(e -> e.getChannel().close()));
-//        connections.clear();
         try (AsynchronousServerSocketChannel close = this.asynchronousServerSocketChannel) {
         }
     }
