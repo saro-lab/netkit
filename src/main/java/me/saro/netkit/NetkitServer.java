@@ -27,6 +27,14 @@ public class NetkitServer implements Closeable {
     @Getter @Setter(value=AccessLevel.PACKAGE) AsynchronousServerSocketChannel asynchronousServerSocketChannel;
     @Getter final Map<String, NetkitConnection> connections = new ConcurrentHashMap<>();
 
+    /**
+     * bind server
+     * @param port
+     * @param byteBufferUnitSize
+     * @param asynchronousChannelGroup
+     * @return
+     * @throws IOException
+     */
     public static NetkitServer bind(int port, int byteBufferUnitSize, AsynchronousChannelGroup asynchronousChannelGroup) throws IOException {
         NetkitServer server = new NetkitServer();
         server.setAsynchronousChannelGroup(asynchronousChannelGroup);
@@ -36,38 +44,54 @@ public class NetkitServer implements Closeable {
         return server;
     }
 
+    /**
+     * bind server
+     * @param port
+     * @param byteBufferUnitSize
+     * @return
+     * @throws IOException
+     */
     public static NetkitServer bind(int port, int byteBufferUnitSize) throws IOException {
         return bind(port, byteBufferUnitSize, null);
     }
 
+    /**
+     * bind server
+     * @param port
+     * @return
+     * @throws IOException
+     */
     public static NetkitServer bind(int port) throws IOException {
         return bind(port, 8192, null);
     }
 
+    /**
+     * using static bind
+     */
     NetkitServer() {
     }
-
-    void validator() {
-        // each of a connection byte buffer size
-        if (byteBufferUnitSize >= 32) {
-            log.info("each of a connection byte buffer size is " + byteBufferUnitSize + " bytes");
-        } else {
-            throw new IllegalArgumentException("byteBufferUnitSize min value is 32");
-        }
+    
+    /**
+     * accept
+     * @return
+     */
+    public <T extends NetkitConnection> NetkitServerAccepter accept() {
+        NetkitServerAccepter accept = new NetkitServerAccepter();
         
-        // asynchronous channel group
-        log.info("using asynchronous channel group : " + (asynchronousChannelGroup != null));
+        accept.setByteBufferUnitSize(byteBufferUnitSize);
+        accept.setAsynchronousServerSocketChannel(asynchronousServerSocketChannel);
+        accept.setConnections(connections);
+        
+        return accept;
     }
-
-    void run() throws IOException {
-
-        System.out.println(
-                    "________________________________________________________________\n\n"
-                +   " S  A  R  O\n\n"
-                +   " N E T K I T    S E R V E R\n\n"
-                +   " https://github.com/saro-lab/netkit\n"
-                + "________________________________________________________________\n");
-
+    
+    /**
+     * run server
+     * @throws IOException
+     */
+    private void run() throws IOException {
+        
+        welcome();
         validator();
         
         asynchronousServerSocketChannel = asynchronousChannelGroup != null 
@@ -81,23 +105,45 @@ public class NetkitServer implements Closeable {
         log.info("bind port " + port);
     }
     
-    public <T extends NetkitConnection> NetkitServerAccepter accept() {
-        NetkitServerAccepter accept = new NetkitServerAccepter();
+    /**
+     * welcome
+     */
+    private void welcome() {
+        System.out.println(
+                "________________________________________________________________\n\n"
+            +   " S  A  R  O\n\n"
+            +   " N E T K I T    S E R V E R\n\n"
+            +   " https://github.com/saro-lab/netkit\n"
+            + "________________________________________________________________\n");
+    }
+
+    /**
+     * validator
+     */
+    private void validator() {
+        // each of a connection byte buffer size
+        if (byteBufferUnitSize >= 32) {
+            log.info("each of a connection byte buffer size is " + byteBufferUnitSize + " bytes");
+        } else {
+            throw new IllegalArgumentException("byteBufferUnitSize min value is 32");
+        }
         
-        accept.setByteBufferUnitSize(byteBufferUnitSize);
-        accept.setAsynchronousServerSocketChannel(asynchronousServerSocketChannel);
-        accept.setConnections(connections);
-        
-        return accept;
+        // asynchronous channel group
+        log.info("using asynchronous channel group : " + (asynchronousChannelGroup != null));
     }
     
+    /**
+     * close
+     */
     @Override
     public void close() throws IOException {
-        connections.forEach((k , v) -> {
-
+        connections.entrySet().parallelStream().forEach(e -> {
+            try (e.getValue().channel) {
+            } catch (Exception ex) {
+            }
+            connections.remove(e.getKey());
         });
         try (AsynchronousServerSocketChannel close = this.asynchronousServerSocketChannel) {
         }
     }
-
 }
