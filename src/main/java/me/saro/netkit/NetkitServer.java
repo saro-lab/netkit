@@ -3,8 +3,8 @@ package me.saro.netkit;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.channels.AsynchronousChannel;
 import java.nio.channels.AsynchronousServerSocketChannel;
+import java.nio.channels.AsynchronousSocketChannel;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -17,7 +17,7 @@ public class NetkitServer implements Closeable {
     int port;
     int bufferSize;
     AsynchronousServerSocketChannel socketChannel;
-    List<AsynchronousChannel> channels = Collections.synchronizedList(new LinkedList<>());
+    List<NetkitSocketChannel> channels = Collections.synchronizedList(new LinkedList<>());
     
     private NetkitServer() {
     }
@@ -43,12 +43,19 @@ public class NetkitServer implements Closeable {
         return bind(port, 8192);
     }
     
-    void addChannels(AsynchronousChannel channel) {
-        channels.add(channel);
+    NetkitSocketChannel addChannels(AsynchronousSocketChannel channel) throws IOException {
+        var ch = new NetkitSocketChannel(channel);
+        channels.add(ch);
+        return ch;
     }
     
-    void delChannels(AsynchronousChannel channel) {
-        
+    void removeChannel(NetkitSocketChannel channel) {
+        channel.close();
+        channels.remove(channel);
+    }
+    
+    void collectChannels() {
+        channels.parallelStream().filter(e -> !e.isOpen()).forEach(channels::remove);
     }
     
     /**
