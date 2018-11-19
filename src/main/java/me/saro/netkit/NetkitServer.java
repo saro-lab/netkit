@@ -10,7 +10,6 @@ import java.util.LinkedList;
 import java.util.List;
 
 import lombok.extern.log4j.Log4j2;
-import notuse.me.saro.netkit.NetkitConnection;
 
 @Log4j2
 public class NetkitServer implements Closeable {
