@@ -41,7 +41,7 @@
         <java.version>10</java.version>
         <junit.version>5.3.1</junit.version>
         <reactor.version>3.2.1.RELEASE</reactor.version>
-        <log4j.version>2.11.1</log4j.version>
+        <log4j.version>2.13.3</log4j.version>
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
     </properties>
